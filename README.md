@@ -3,7 +3,19 @@ It is a simplified version of a real task in our project.
 
 Create a public fork of this repository and send us a link to your fork when you are done.
 
-# Task
+# Table of Contents
+- [Task Overview](#task-overview)
+- [Solution Approach](#solution-approach)
+  - [Database Schema](#database-schema)
+  - [Design Decisions](#design-decisions)
+- [Running the Application](#running-the-application)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
+  - [Running the CLI Script](#running-the-cli-script)
+  - [Running the API Server](#running-the-api-server)
+- [Testing](#testing)
+
+# Task Overview
 
 We have millions of job postings crawled from the internet and want to calculate some statistics about days to hire.
 
@@ -26,7 +38,9 @@ class JobPosting:
 - `days_to_hire` -- a number of days between posting date and hire date. 
   It can be `None` if a job posting is not hired yet.
 
-## 1. Create a table in the database to store "days to hire" statistics. 
+## Requirements
+
+### 1. Create a table in the database to store "days to hire" statistics. 
 
 - Statistics should be per country(also global for the world) and per standard job.
 - It should contain average, minimum, and maximum days to hire.
@@ -37,7 +51,7 @@ You can add SQLAlchemy model to `home_task.models` module and generate a migrati
 
     alembic revision --autogenerate -m "<description>"
 
-## 2. Write a CLI script to calculate "days to hire" statistics and store it in a created table.
+### 2. Write a CLI script to calculate "days to hire" statistics and store it in a created table.
 
 `days_to_hire` can contain potentially invalid values, because it is quite difficult to gather this information.
 For example, 1 day in most cases means that job posting was closed and reopened without real hiring.
@@ -55,7 +69,7 @@ So we want to cut lowest and highest percentiles of `days_to_hire` before calcul
   Job postings with `country_code` equal to `NULL` should be included in this calculation.
 - Overwrite existing rows in the table. We need only the latest statistics.
 
-## 3. Create REST API with one endpoint to get "days to hire" statistics.
+### 3. Create REST API with one endpoint to get "days to hire" statistics.
 
 - Endpoint should accept `standard_job_id` and `country_code` as request parameters.
 - If `country_code` is not specified, return statistics for the world.
