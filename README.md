@@ -71,27 +71,135 @@ Response example:
         "job_postings_number": 100,
     }
 
-# Some information to consider
+# Solution Approach
 
-- Use FastAPI for REST API.
-- It is not necessary to use ORM. You can use raw SQL queries. 
-  Connection to the database is available in `home_task.db` module.
-- In a real environment code can fail at any moment with some probability. The database should not be corrupted.
-- In a real database we have millions of rows, so you can't load all of them into memory at once.
-- In a real environment new job postings are continuously added to the database. 
-  For simplicity, you can assume that data is frozen and will not change during script execution.
+## Database Schema
+- Created a `days_to_hire_stats` table using SQLAlchemy with the following columns:
+  - `id` (Integer, primary key)
+  - `standard_job_id` (String)
+  - `country_code` (String, nullable)
+  - `avg_days_to_hire` (Float)
+  - `min_days_to_hire` (Float)
+  - `max_days_to_hire` (Float)
+  - `job_postings_count` (Integer)
 
-# Installation
+## Design Decisions
 
-Install packages with poetry:
+### SQL-based Processing
+The solution uses SQL for data processing instead of loading data into memory for several reasons:
 
+1. **Memory Efficiency**
+   - With millions of rows, loading all data into memory would be impractical and could cause out-of-memory errors
+   - SQL allows processing data in the database where it's already stored, eliminating the need for large memory allocations
+   - Data is processed in groups by standard_job_id and country_code, reducing memory requirements
+
+2. **Data Safety**
+   - SQL transactions ensure data consistency even if the process fails
+   - If the script crashes, the database remains in a consistent state
+   - No risk of partial updates or corrupted data
+
+3. **Performance**
+   - Database engines are optimized for large-scale data processing
+   - Percentile calculations are performed efficiently using SQL's built-in functions
+   - Reduces network overhead by processing data where it's stored
+   - Each job-country combination is processed independently, allowing for parallel processing if needed
+
+4. **Real-time Data Handling**
+   - SQL queries always work with the latest data
+   - No need to worry about data changes during processing
+   - Queries are atomic and consistent
+
+## CLI Script
+- Implemented a CLI script `calculate_days_to_hire_stats.py` that:
+  - Uses SQL for efficient data processing with percentiles
+  - Handles transactions safely
+  - Processes data in chunks to handle large datasets
+  - Includes error handling and logging
+  - Supports configurable minimum postings threshold
+  - Calculates both country-specific and global statistics
+
+## REST API
+- Built using FastAPI with the following endpoints:
+  - `GET /api/v1/health` - Health check endpoint
+  - `GET /api/v1/days-to-hire` - Get days to hire statistics
+    - Query parameters:
+      - `standard_job_id` (required): The standard job ID
+      - `country_code` (optional): Country code for country-specific statistics
+
+# Running the Application
+
+## Prerequisites
+- Python 3.10 or higher
+- Docker and Docker Compose
+- Poetry (Python package manager)
+
+## Installation
+
+1. Create and activate a virtual environment:
+    ```bash
     python3 -m venv venv
     . venv/bin/activate
+    ```
+
+2. Install dependencies:
+    ```bash
     pip install poetry
-    POETRY_VIRTUALENVS_CREATE=false poetry install
+    poetry install
+    ```
 
-Create database:
-
+3. Start the database:
+    ```bash
     docker-compose up -d
+    ```
+
+4. Run database migrations:
+    ```bash
     docker cp migrations/data/ hrf_universe_postgres:/tmp
-    alembic upgrade head
+    poetry run alembic upgrade head
+    ```
+
+## Running the CLI Script
+
+Calculate days to hire statistics:
+```bash
+poetry run python -m home_task.scripts.calculate_days_to_hire_stats [--min-postings MIN_POSTINGS] [--log-level LOG_LEVEL]
+```
+
+Options:
+- `--min-postings`: Minimum number of job postings required (default: 5)
+- `--log-level`: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) (default: INFO)
+
+## Running the API Server
+
+Start the FastAPI server:
+
+For development (with auto-reload):
+```bash
+poetry run uvicorn home_task.app:app --reload --host 0.0.0.0 --port 8000
+```
+
+For production:
+```bash
+poetry run uvicorn home_task.app:app --host 0.0.0.0 --port 8000
+```
+
+The API will be available at `http://localhost:8000`
+
+# Testing
+
+Run the test suite:
+```bash
+poetry run pytest
+```
+
+The test suite includes:
+- API endpoint tests
+- CLI script tests
+- Database model tests
+
+Test coverage includes:
+- Health check endpoint
+- Days to hire statistics endpoint
+- Error handling
+- Database operations
+- CLI script functionality
